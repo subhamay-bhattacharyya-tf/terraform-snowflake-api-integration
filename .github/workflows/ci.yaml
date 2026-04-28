@@ -11,16 +11,12 @@ on:
       - '*.tf'
       - 'examples/**'
       - 'tests/**'
-      - 'utils/**'
-      - 'README.md'
   pull_request:
     branches: [main]
     paths:
       - '*.tf'
       - 'examples/**'
       - 'tests/**'
-      - 'utils/**'
-      - 'README.md'
   workflow_dispatch:
 
 permissions:
