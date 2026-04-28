@@ -3,11 +3,11 @@
 # -----------------------------------------------------------------------------
 # Provisions one AWS, one Azure, and one GCP API integration in a single
 # module call. Defaults are placeholder identifiers so the example validates
-# without input; override the entire `api_integrations` map (or individual
-# fields via tfvars) for a real apply.
+# without input; override the entire `api_integration_configs` map (or
+# individual fields via tfvars) for a real apply.
 # -----------------------------------------------------------------------------
 
-variable "api_integrations" {
+variable "api_integration_configs" {
   description = "Map of Snowflake API integrations to create across AWS, Azure, and GCP."
   type = map(object({
     name                 = string
@@ -23,6 +23,8 @@ variable "api_integrations" {
     azure_ad_application_id = optional(string, null)
 
     google_audience = optional(string, null)
+
+    api_key = optional(string, null)
   }))
   default = {
     aws_api_gw = {

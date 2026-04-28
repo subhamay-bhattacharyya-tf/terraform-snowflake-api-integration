@@ -1,13 +1,13 @@
 # -----------------------------------------------------------------------------
-# Terraform Snowflake API Integration Module - Basic Example Variables
+# Terraform Snowflake API Integration Module - AWS API Gateway Example Vars
 # -----------------------------------------------------------------------------
-# Single AWS API Gateway integration. Override `api_integrations` from the
-# command line / tfvars to change the integration name, role ARN, or allowed
-# prefixes. Defaults are provided so `terraform validate` works without any
-# input.
+# Single AWS API Gateway integration. Override `api_integration_configs` from
+# the command line / tfvars to change the integration name, role ARN, or
+# allowed prefixes. Defaults are provided so `terraform validate` works
+# without any input.
 # -----------------------------------------------------------------------------
 
-variable "api_integrations" {
+variable "api_integration_configs" {
   description = "Map of Snowflake API integrations to create."
   type = map(object({
     name                 = string
@@ -23,6 +23,8 @@ variable "api_integrations" {
     azure_ad_application_id = optional(string, null)
 
     google_audience = optional(string, null)
+
+    api_key = optional(string, null)
   }))
   default = {
     aws_api_gw = {

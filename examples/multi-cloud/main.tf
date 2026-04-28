@@ -8,5 +8,5 @@
 module "snowflake_api_integration" {
   source = "../.."
 
-  api_integrations = var.api_integrations
+  api_integration_configs = var.api_integration_configs
 }

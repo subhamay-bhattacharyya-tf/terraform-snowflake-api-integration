@@ -1,0 +1,43 @@
+# -----------------------------------------------------------------------------
+# Example tfvars for examples/multi-cloud
+# -----------------------------------------------------------------------------
+# Copy to terraform.tfvars and fill in real values, OR set the corresponding
+# TF_VAR_* environment variables.
+# -----------------------------------------------------------------------------
+
+api_integration_configs = {
+  aws_api_gw = {
+    name             = "AWS_API_INT"
+    api_provider     = "aws_api_gateway"
+    api_aws_role_arn = "arn:aws:iam::123456789012:role/snowflake-api-role"
+
+    api_allowed_prefixes = [
+      "https://abc123.execute-api.us-east-1.amazonaws.com/prod/",
+    ]
+  }
+  azure_api_mgmt = {
+    name                    = "AZURE_API_INT"
+    api_provider            = "azure_api_management"
+    azure_tenant_id         = "00000000-0000-0000-0000-000000000000"
+    azure_ad_application_id = "11111111-1111-1111-1111-111111111111"
+
+    api_allowed_prefixes = [
+      "https://contoso-api.azure-api.net/external/",
+    ]
+  }
+  gcp_api_gw = {
+    name            = "GCP_API_INT"
+    api_provider    = "google_api_gateway"
+    google_audience = "snowflake-external-functions"
+
+    api_allowed_prefixes = [
+      "https://us-central1-my-project.cloudfunctions.net/snowflake-external-functions/",
+    ]
+  }
+}
+
+snowflake_organization_name = "MY_ORG"
+snowflake_account_name      = "MY_ACCOUNT"
+snowflake_user              = "TF_SERVICE_USER"
+snowflake_role              = "ACCOUNTADMIN"
+# snowflake_private_key = file("~/.snowflake/tf-service-user.p8")

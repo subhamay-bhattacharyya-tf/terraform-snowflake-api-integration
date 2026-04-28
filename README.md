@@ -3,20 +3,28 @@
 ![Release](https://github.com/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration/actions/workflows/ci.yaml/badge.svg)&nbsp;![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white)&nbsp;![Commit Activity](https://img.shields.io/github/commit-activity/t/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration)&nbsp;![Last Commit](https://img.shields.io/github/last-commit/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration)&nbsp;![Release Date](https://img.shields.io/github/release-date/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration)&nbsp;![Repo Size](https://img.shields.io/github/repo-size/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration)&nbsp;![File Count](https://img.shields.io/github/directory-file-count/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration)&nbsp;![Issues](https://img.shields.io/github/issues/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration)&nbsp;![Top Language](https://img.shields.io/github/languages/top/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration)&nbsp;![Custom Endpoint](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bsubhamay/e69b8c605f94271ea3441aabb7e8820b/raw/terraform-snowflake-api-integration.json?)
 
 A Terraform module for creating and managing Snowflake API integrations
-across AWS API Gateway, Azure API Management, and Google Cloud
-Functions / API Gateway. Provisions one or more `snowflake_api_integration`
-resources from a single map-based input.
+across AWS API Gateway (public, private, GovCloud public, GovCloud private),
+Azure API Management, and Google API Gateway. Provisions one or more
+`snowflake_api_integration` resources from a single map-based input.
+
+> **Note on `git_https_api`:** The `snowflakedb/snowflake` provider does not
+> currently expose `git_https_api` as a value for `api_provider` (see the
+> [provider's resource doc](https://github.com/snowflakedb/terraform-provider-snowflake/blob/main/docs/resources/api_integration.md)).
+> Snowflake Git API integrations (used by Streamlit-in-Snowflake) must be
+> managed outside this module until the provider adds support.
 
 ## Features
 
 - Map-based configuration for creating one or many API integrations in a
   single module call
-- Built-in input validation: `api_provider` enum, mutual exclusivity of
-  AWS / Azure / GCP fields, IAM role ARN format, Azure tenant UUID format
-- Outputs keyed by integration identifier for easy cross-resource lookup
-- Per-cloud identity outputs (`api_aws_iam_user_arn`,
-  `api_aws_external_id`, `azure_consent_url`,
-  `azure_multi_tenant_app_name`) for downstream IAM trust policy setup
+- Supports the six provider variants accepted by `snowflake_api_integration`:
+  `aws_api_gateway`, `aws_private_api_gateway`, `aws_gov_api_gateway`,
+  `aws_gov_private_api_gateway`, `azure_api_management`, `google_api_gateway`
+- Built-in input validation: `api_provider` enum (case-insensitive),
+  required `api_aws_role_arn` for AWS variants (with ARN format check),
+  required `azure_tenant_id` + `azure_ad_application_id` for Azure,
+  required `google_audience` for GCP
+- Outputs keyed by integration identifier for cross-resource lookup
 - Cloud-side IAM roles, Azure AD applications, and GCP service accounts are
   intentionally **not** managed here -- they live in their respective cloud
   provider modules and are referenced by ARN / tenant ID / audience
@@ -29,7 +37,7 @@ resources from a single map-based input.
 module "snowflake_api_integration" {
   source = "github.com/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration?ref=main"
 
-  api_integrations = {
+  api_integration_configs = {
     aws_api_gw = {
       name             = "AWS_API_INT"
       api_provider     = "aws_api_gateway"
@@ -57,7 +65,7 @@ module "snowflake_api_integration" {
 module "snowflake_api_integration" {
   source = "github.com/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration?ref=main"
 
-  api_integrations = {
+  api_integration_configs = {
     aws_api_gw = {
       name             = "AWS_API_INT"
       api_provider     = "aws_api_gateway"
@@ -96,49 +104,47 @@ create.
 
 ## Examples
 
-| Example                             | Description                                                                                        |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------- |
-| [basic](examples/basic)             | Single AWS API Gateway integration. Reference for new users learning the module's input shape.     |
-| [multi-cloud](examples/multi-cloud) | AWS + Azure + GCP integrations in a single module call. Reference for the multi-provider use case. |
+| Example                                       | Description                                                                                        |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| [aws-api-gateway](examples/aws-api-gateway)   | Single AWS API Gateway integration. Reference for new users learning the module's input shape.     |
+| [multi-cloud](examples/multi-cloud)           | AWS + Azure + GCP integrations in a single module call. Reference for the multi-provider use case. |
 
 <!-- BEGIN_TF_DOCS -->
 ## Resources
 
-| Name                                                                                                                                     | Type     |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| [snowflake_api_integration.this](https://registry.terraform.io/providers/Snowflake-Labs/snowflake/latest/docs/resources/api_integration) | resource |
+| Name                                                                                                                                  | Type     |
+| ------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| [snowflake_api_integration.this](https://registry.terraform.io/providers/snowflakedb/snowflake/latest/docs/resources/api_integration) | resource |
 
 ## Inputs
 
-| Name                                                                                 | Description                                                                                                                                            | Type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Default | Required |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | :------: |
-| <a name="input_api_integrations"></a> [api\_integrations](#input\_api\_integrations) | Map of Snowflake API integrations to create. Map key is a logical Terraform identifier; the actual Snowflake API integration name is the `name` field. | <pre>map(object({<br/>    name                 = string<br/>    api_provider         = string<br/>    api_allowed_prefixes = list(string)<br/>    api_blocked_prefixes = optional(list(string), [])<br/>    enabled              = optional(bool, true)<br/>    comment              = optional(string, null)<br/><br/>    # AWS API Gateway<br/>    api_aws_role_arn = optional(string, null)<br/><br/>    # Azure API Management<br/>    azure_tenant_id         = optional(string, null)<br/>    azure_ad_application_id = optional(string, null)<br/><br/>    # Google Cloud<br/>    google_audience = optional(string, null)<br/>  }))</pre> | `{}`    |    no    |
+| Name                                                                                                       | Description                                                                                                                                                  | Type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Default | Required |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | :------: |
+| <a name="input_api_integration_configs"></a> [api\_integration\_configs](#input\_api\_integration\_configs) | Map of configuration objects for Snowflake API integrations. The map key is a logical Terraform identifier; the actual Snowflake API integration name is the `name` field. | <pre>map(object({<br/>    name                 = string<br/>    api_provider         = string<br/>    api_allowed_prefixes = list(string)<br/>    api_blocked_prefixes = optional(list(string), [])<br/>    enabled              = optional(bool, true)<br/>    comment              = optional(string, null)<br/><br/>    api_aws_role_arn = optional(string, null)<br/><br/>    azure_tenant_id         = optional(string, null)<br/>    azure_ad_application_id = optional(string, null)<br/><br/>    google_audience = optional(string, null)<br/><br/>    api_key = optional(string, null)<br/>  }))</pre> | `{}`    |    no    |
 
 ## Outputs
 
-| Name                                                                                                                             | Description                                                                                                               |
-| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| <a name="output_api_aws_external_ids"></a> [api\_aws\_external\_ids](#output\_api\_aws\_external\_ids)                           | Map of integration map keys to the Snowflake-managed external ID. Pin this in your AWS-side IAM trust policy condition.   |
-| <a name="output_api_aws_iam_user_arns"></a> [api\_aws\_iam\_user\_arns](#output\_api\_aws\_iam\_user\_arns)                      | Map of integration map keys to the Snowflake-managed IAM user ARN. Pin this in your AWS-side IAM trust policy.            |
-| <a name="output_api_integration_ids"></a> [api\_integration\_ids](#output\_api\_integration\_ids)                                | Map of integration map keys to Snowflake API integration IDs.                                                             |
-| <a name="output_api_integration_names"></a> [api\_integration\_names](#output\_api\_integration\_names)                          | Map of integration map keys to Snowflake API integration names.                                                           |
-| <a name="output_api_integration_providers"></a> [api\_integration\_providers](#output\_api\_integration\_providers)              | Map of integration map keys to the `api_provider` of each integration.                                                    |
-| <a name="output_azure_consent_urls"></a> [azure\_consent\_urls](#output\_azure\_consent\_urls)                                   | Map of integration map keys to the Azure admin consent URL for the multi-tenant app. Visit each URL once per integration. |
-| <a name="output_azure_multi_tenant_app_names"></a> [azure\_multi\_tenant\_app\_names](#output\_azure\_multi\_tenant\_app\_names) | Map of integration map keys to the Azure multi-tenant app name created for each integration.                              |
+| Name                                                                                                                                              | Description                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| <a name="output_api_integration_names"></a> [api\_integration\_names](#output\_api\_integration\_names)                                           | Names of the created API integrations, keyed by config key.                                                              |
+| <a name="output_api_integration_fully_qualified_names"></a> [api\_integration\_fully\_qualified\_names](#output\_api\_integration\_fully\_qualified\_names) | Fully qualified names of the API integrations, keyed by config key.                                                |
+| <a name="output_api_integrations"></a> [api\_integrations](#output\_api\_integrations)                                                            | All API integration resources, keyed by config key. Marked sensitive because `api_key` may be present.                   |
 <!-- END_TF_DOCS -->
 
 ## Validation
 
 The module validates inputs and provides descriptive error messages for:
 
-- Empty or invalid Snowflake API integration `name`
-- `api_provider` not in the allowed enum (`aws_api_gateway`,
-  `azure_api_management`, `google_api_gateway`)
+- Empty or invalid Snowflake API integration `name` (must be a valid
+  Snowflake unquoted identifier)
+- `api_provider` not in the supported enum (`aws_api_gateway`,
+  `aws_private_api_gateway`, `aws_gov_api_gateway`,
+  `aws_gov_private_api_gateway`, `azure_api_management`,
+  `google_api_gateway`)
 - `api_allowed_prefixes` empty
-- AWS provider missing `api_aws_role_arn`, or `api_aws_role_arn` not a
-  valid IAM role ARN
-- Azure provider missing `azure_tenant_id` or `azure_ad_application_id`,
-  or `azure_tenant_id` not a valid UUID
+- AWS variant missing `api_aws_role_arn`, or `api_aws_role_arn` not a
+  valid IAM role ARN (`arn:aws[-partition]:iam::<12-digit>:role/<name>`)
+- Azure provider missing `azure_tenant_id` or `azure_ad_application_id`
 - GCP provider missing `google_audience`
 
 ## Testing
@@ -149,7 +155,7 @@ Snowflake API integrations, assert outputs, and destroy on teardown.
 ```bash
 cd tests
 go mod tidy
-go test -v -timeout 30m -run TestSnowflakeApiIntegrationBasic
+go test -v -timeout 30m -run TestSnowflakeApiIntegrationAws
 ```
 
 Required environment variables for testing:
@@ -182,9 +188,9 @@ The workflow runs the following jobs:
 | Job                                   | Description                                                                                        |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `terraform-validate`                  | `fmt -check`, `init`, `validate` on the root module; runs `utils/lint.sh` (tflint + trivy)         |
-| `examples-validate`                   | `init` + `validate` on `examples/basic` and `examples/multi-cloud`                                 |
+| `examples-validate`                   | `init` + `validate` on `examples/aws-api-gateway` and `examples/multi-cloud`                       |
 | `docs-drift`                          | Regenerates README tables via `utils/generate-docs.sh` + `utils/align-md-tables.py`; fails on diff |
-| `snowflake-api-integration-terratest` | Real Snowflake integration test (`TestSnowflakeApiIntegrationBasic`); refreshes the README badge   |
+| `snowflake-api-integration-terratest` | Real Snowflake integration test (`TestSnowflakeApiIntegrationAws`); refreshes the README badge     |
 | `generate-changelog`                  | `git-cliff` runs on non-main branches                                                              |
 | `semantic-release`                    | Runs only on `main`; refreshes the README badge with the new version                               |
 
@@ -193,7 +199,7 @@ The CI workflow uses the following GitHub repository / organization variables:
 | Variable                      | Description                                                          | Default |
 | ----------------------------- | -------------------------------------------------------------------- | ------- |
 | `TERRAFORM_VERSION`           | Terraform version for CI jobs                                        | `1.5.0` |
-| `GO_VERSION`                  | Go version for Terratest                                             | `1.21`  |
+| `GO_VERSION`                  | Go version for Terratest                                             | `1.22`  |
 | `SNOWFLAKE_ORGANIZATION_NAME` | Snowflake organization name                                          | -       |
 | `SNOWFLAKE_ACCOUNT_NAME`      | Snowflake account name                                               | -       |
 | `SNOWFLAKE_ACCOUNT`           | Target Snowflake account identifier                                  | -       |

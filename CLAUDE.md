@@ -6,9 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **Terraform module** that creates and manages **Snowflake API integrations** using infrastructure as code.
 
-The module is a single, flat Terraform module rooted at the repository root (`main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`). It accepts a single map-based input (`api_integrations`) and exposes maps of resource attributes as outputs, allowing one module call to provision many API integrations via `for_each`.
+The module is a single, flat Terraform module rooted at the repository root (`main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`). It accepts a single map-based input (`api_integration_configs`) and exposes maps of resource attributes as outputs, allowing one module call to provision many API integrations via `for_each`.
 
 The module manages only `snowflake_api_integration` resources. External functions, IAM roles / service principals on the cloud side, and the trust policies that bind them to Snowflake are intentionally out of scope and should be managed by separate, composable modules to prevent drift and keep the security boundary explicit.
+
+**`git_https_api` is unsupported.** The `snowflakedb/snowflake` provider's `snowflake_api_integration` resource explicitly rejects `api_provider = git_https_api` (validator `StringInSlice` does not include it; create's `default` switch arm errors with `unexpected provider %v`). Snowflake Git API integrations (e.g. for Streamlit-in-Snowflake) must be managed outside this module. If a downstream caller asks to add `git_https_api` here, push back — confirm the provider state has not changed before reopening the design.
 
 ## Common commands
 
@@ -20,11 +22,11 @@ terraform fmt -check -recursive
 terraform init -backend=false && terraform validate
 
 # Validate examples
-cd examples/basic && terraform init -backend=false && terraform validate
+cd examples/aws-api-gateway && terraform init -backend=false && terraform validate
 cd examples/multi-cloud && terraform init -backend=false && terraform validate
 
 # Run Terratest integration test (requires Snowflake auth + SNOWFLAKE_ACCOUNT env var)
-cd tests && go test -v -timeout 30m -run TestSnowflakeApiIntegrationBasic ./snowflake_api_integration_basic_test.go ./helpers_test.go
+cd tests && go test -v -timeout 30m -run TestSnowflakeApiIntegrationAws ./snowflake_api_integration_aws_test.go ./helpers_test.go
 
 # Run helper utilities
 bash utils/generate-docs.sh           # refresh terraform-docs tables in README.md
@@ -49,10 +51,10 @@ pre-commit run --all-files
 ├── .devcontainer/                                 # Dev container definition for reproducible local dev
 ├── .github/                                       # GitHub Actions workflows, issue/PR templates
 ├── examples/
-│   ├── basic/                                     # Single AWS API Gateway integration
+│   ├── aws-api-gateway/                           # Single AWS API Gateway integration
 │   └── multi-cloud/                               # AWS + Azure + GCP integrations in one module call
 ├── tests/
-│   ├── snowflake_api_integration_basic_test.go    # Terratest: creates real API integrations, asserts outputs, destroys
+│   ├── snowflake_api_integration_aws_test.go      # Terratest: creates a real AWS API integration, asserts outputs, destroys
 │   └── helpers_test.go                            # Shared test helpers
 ├── utils/
 │   ├── generate-docs.sh                           # Runs terraform-docs to refresh README inputs/outputs tables
@@ -70,9 +72,9 @@ pre-commit run --all-files
 ├── LICENSE
 ├── install-tools.sh                               # Installs Terraform, tflint, trivy, etc. (devcontainer/Linux)
 ├── main.tf                                        # Creates snowflake_api_integration resources via for_each
-├── variables.tf                                   # api_integrations map variable with validations
-├── outputs.tf                                     # Maps of id, name, api_provider, api_aws_iam_user_arn, api_aws_external_id, etc.
-├── versions.tf                                    # Required Terraform and Snowflake provider versions
+├── variables.tf                                   # api_integration_configs map variable with validations
+├── outputs.tf                                     # api_integration_names, api_integration_fully_qualified_names, api_integrations (sensitive)
+├── versions.tf                                    # Required Terraform (>= 1.3.0) and snowflakedb/snowflake (>= 1.0.0) versions
 ├── package.json                                   # semantic-release plugin definitions
 ├── package-lock.json
 └── README.md
@@ -80,33 +82,34 @@ pre-commit run --all-files
 
 ## Examples
 
-The `examples/` directory contains end-to-end, runnable configurations that exercise the module against real Snowflake API integrations. Each example is a self-contained Terraform configuration that calls the root module via a relative `source = "../.."` reference, declares its own `terraform` and `provider` blocks, and uses the module's `api_integrations` map input.
+The `examples/` directory contains end-to-end, runnable configurations that exercise the module against real Snowflake API integrations. Each example is a self-contained Terraform configuration that calls the root module via a relative `source = "../.."` reference, declares its own `terraform` and `provider` blocks, and uses the module's `api_integration_configs` map input.
 
 Each example must:
 
-- Use the module's `api_integrations` map-based input shape — never inline `snowflake_api_integration` resources
+- Use the module's `api_integration_configs` map-based input shape — never inline `snowflake_api_integration` resources
 - Reference real cloud identities (IAM role ARNs, Azure tenant IDs, GCP service accounts) that a Terratest run can create or assume exist
 - Include a short `README.md` explaining what the example demonstrates, the cloud trust setup it assumes, and the API endpoint prefixes it allows
+- Ship a `terraform.tfvars.example` file showing the expected variable shape
 - Be validated by the `examples-validate` CI step (`terraform init -backend=false && terraform validate`)
 
-### `basic/`
+### `aws-api-gateway/`
 
 A single **AWS API Gateway** integration — the minimum viable usage. Demonstrates:
 
-- Calling the module with a single-entry `api_integrations` map
+- Calling the module with a single-entry `api_integration_configs` map
 - Setting `api_provider = "aws_api_gateway"` and supplying `api_aws_role_arn`
-- Configuring `api_allowed_prefixes` to scope the integration to specific API Gateway stages
-- Reading `api_aws_iam_user_arn` and `api_aws_external_id` outputs to wire up the IAM trust policy on the AWS side
+- Configuring `api_allowed_prefixes` to scope the integration to specific API Gateway stages, plus `api_blocked_prefixes` to exclude admin paths
+- Reading `api_aws_iam_user_arn` and `api_aws_external_id` (via the sensitive `api_integrations` output) to wire up the IAM trust policy on the AWS side
 
 Use this as the reference for new users learning the module's input shape.
 
-#### Sample `api_integrations` map
+#### Sample `api_integration_configs` map
 
 ```hcl
 module "snowflake_api_integration" {
   source = "../.."
 
-  api_integrations = {
+  api_integration_configs = {
     aws_api_gw = {
       name             = "AWS_API_INT"
       api_provider     = "aws_api_gateway"
@@ -134,11 +137,11 @@ The map key (`aws_api_gw`) is a logical Terraform identifier used in `for_each` 
 
 Provisions **AWS, Azure, and GCP** integrations in a single module call — demonstrates the map-based, multi-provider use case. Demonstrates:
 
-- One `api_integrations` map with three entries, each using a different `api_provider`
+- One `api_integration_configs` map with three entries, each using a different `api_provider`
 - AWS entry: `api_aws_role_arn` + AWS prefixes
 - Azure entry: `azure_tenant_id` + `azure_ad_application_id` + Azure Functions prefixes
 - GCP entry: `google_audience` + Cloud Functions prefixes
-- Reading the per-cloud identity outputs (`api_aws_iam_user_arn` / `api_aws_external_id` for AWS, `azure_consent_url` / `azure_multi_tenant_app_name` for Azure, `gcp_service_account` for GCP) to drive downstream cloud-side trust setup
+- Reading the per-cloud identity values (`api_aws_iam_user_arn` / `api_aws_external_id` for AWS, `azure_consent_url` / `azure_multi_tenant_app_name` for Azure) via the sensitive `api_integrations` output to drive downstream cloud-side trust setup
 
 Use this as the reference when standing up Snowflake external functions across multiple clouds in one Terraform run.
 
@@ -218,15 +221,15 @@ Plus the cloud-side identity values referenced by each example:
 - `TEST_AZURE_TENANT_ID` and `TEST_AZURE_AD_APP_ID` — Azure AD tenant and multi-tenant application used by the Azure example
 - `TEST_GCP_AUDIENCE` — GCP audience string used by the GCP example
 
-### `snowflake_api_integration_basic_test.go`
+### `snowflake_api_integration_aws_test.go`
 
-End-to-end test for the `examples/basic/` configuration. Covers:
+End-to-end test for the `examples/aws-api-gateway/` configuration. Covers:
 
-- **Apply** — runs `terraform init` + `terraform apply` against `examples/basic/` and asserts the apply succeeds with zero errors
-- **Output assertions** — reads the module's output maps (`api_integration_ids`, `api_integration_names`, `api_aws_iam_user_arns`, `api_aws_external_ids`) and asserts each map has exactly the expected keys and that the values are non-empty and well-formed (e.g. `api_aws_iam_user_arn` matches `arn:aws:iam::*:user/*`)
-- **Snowflake-side verification** — connects directly to Snowflake and asserts the integration appears in `SHOW API INTEGRATIONS`, that `enabled = true`, that `api_provider = 'AWS_API_GATEWAY'`, and that `api_allowed_prefixes` matches the input list
+- **Apply** — runs `terraform init` + `terraform apply` against `examples/aws-api-gateway/` and asserts the apply succeeds with zero errors
+- **Output assertions** — reads the module's non-sensitive output maps (`api_integration_names`, `api_integration_fully_qualified_names`) and asserts each map has the expected key and that the values are correct / non-empty. The sensitive `api_integrations` output (which carries `api_aws_iam_user_arn` / `api_aws_external_id` per resource) is verified out-of-band against Snowflake rather than read through Terratest's plain `OutputMap` (sensitive values are masked unless `OutputJson` is used)
+- **Snowflake-side verification** — connects directly to Snowflake and asserts the integration appears in `SHOW API INTEGRATIONS`, that `enabled = true`, and that `api_provider = 'AWS_API_GATEWAY'`
 - **Idempotency** — runs `terraform plan` after apply and asserts the plan is empty (no drift on a no-op re-run)
-- **Destroy** — runs `terraform destroy` in a `defer` block and asserts the integration no longer appears in `SHOW API INTEGRATIONS`
+- **Destroy** — runs `terraform destroy` in a `defer` block (Snowflake state cleared by Terraform itself; helpers still expose `assertApiIntegrationDestroyed` if a test wants to double-check)
 
 This test is the reference for what a "passing" module change looks like — any new feature should be exercised by either extending this test or adding a sibling test file alongside a new example.
 
@@ -248,11 +251,11 @@ Helpers must not embed test logic — they are pure setup, teardown, and asserti
 
 - The module follows the standard flat Terraform layout (`main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`) at the repository root — there are no submodules under `modules/`
 - All infrastructure changes go through Terraform — never modify Snowflake API integrations manually via the UI or worksheets
-- The module accepts a single `map(object({...}))` input named `api_integrations`, consumed via `for_each`
+- The module accepts a single `map(object({...}))` input named `api_integration_configs`, consumed via `for_each`. The variable is marked `sensitive` because individual entries may set `api_key`
 - The map key is a logical Terraform identifier; the actual Snowflake API integration name is a field inside the object
 - Cloud-side IAM roles, Azure AD applications, and GCP service accounts are intentionally **not** managed by this module — they live in their respective cloud-provider modules and are referenced by ARN / tenant ID / audience here
 - `api_allowed_prefixes` should always be as narrow as practical; broad prefixes (e.g. an entire API Gateway domain without a stage path) are flagged by `lint.sh`
-- Every example under `examples/` must call the root module via `source = "../.."` and use the `api_integrations` map input — no inline `snowflake_api_integration` resources
+- Every example under `examples/` must call the root module via `source = "../.."` and use the `api_integration_configs` map input — no inline `snowflake_api_integration` resources
 - Helper scripts live under `utils/` — anything reusable across local dev and CI (doc generation, lint wrappers, validation helpers, badge updates) belongs there, not at the repo root
 - Integration tests live under `tests/` (note: plural), not `test/` — Go test files, helpers, and any test fixtures all live in this directory; helpers are pure setup/teardown/assertion primitives, never test logic
 - `package.json` and `package-lock.json` must always have their `name` field set to the current repository name (`terraform-snowflake-api-integration`)
@@ -261,23 +264,30 @@ Helpers must not embed test logic — they are pure setup, teardown, and asserti
   - Title (`# Terraform Snowflake API Integration Module`) and the one-line description below it
   - All shields.io badges that interpolate the repo slug (`subhamay-bhattacharyya-tf/terraform-snowflake-api-integration`) — leftover slugs from the upstream template (e.g. `terraform-aws-s3`, `terraform-aws-dynamodb`, `terraform-snowflake-view`) must be swapped
   - The shields.io custom-endpoint badge, which points to a gist-hosted JSON file named `<repo-name>.json` — e.g. `https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bsubhamay/<gist-id>/raw/terraform-snowflake-api-integration.json`. If the `<repo-name>.json` file does not exist in a gist yet, create a new secret gist (e.g. `gh gist create <file> --desc "<repo-name>.json"`) and update the badge URL via `utils/update-badge.sh`; any leftover reference to a prior template's JSON file (e.g. `terraform-snowflake-view.json`) must be replaced
-  - All **Usage** HCL snippets — `source = "github.com/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration?ref=main"` must point at the repo root (no `/modules/<name>` path) and match the current repo name; example inputs must use this module's variable shape (`api_integrations`), not leftover template shapes (`views`, `tables`, `s3_config`, etc.)
-  - The **Examples** table — entries must match the directories under `examples/` (`basic`, `multi-cloud`)
+  - All **Usage** HCL snippets — `source = "github.com/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration?ref=main"` must point at the repo root (no `/modules/<name>` path) and match the current repo name; example inputs must use this module's variable shape (`api_integration_configs`), not leftover template shapes (`api_integrations`, `views`, `tables`, `s3_config`, etc.)
+  - The **Examples** table — entries must match the directories under `examples/` (`aws-api-gateway`, `multi-cloud`)
   - **Inputs** / **Outputs** / **Resources Created** tables — must match the fields declared in `variables.tf` / `outputs.tf` and the resources in `main.tf`; regenerate via `utils/generate-docs.sh`
   - **Validation**, **Testing**, and **CI/CD** sections — test commands must reference the `tests/` directory (plural), and CI job names and required secrets/variables (`SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PRIVATE_KEY`, `SNOWFLAKE_ROLE`, `SNOWFLAKE_WAREHOUSE`, plus the cloud-side `TEST_*` vars) must reference Snowflake API integrations, not leftover services
   - **All GFM tables in `README.md` must be pipe-aligned (markdownlint rule MD060, `table-column-style: aligned`).** After any edit that adds or changes a table, re-align every table so the `|` characters line up vertically across the header, the separator row, and all body rows. Run `utils/align-md-tables.py` to enforce this automatically — do not leave mixed-width tables behind; MD060 will flag them in the IDE. A quick structural check: every row of a given table must have its `|` characters at the same string-column positions (this can be verified by scripting `[k for k,c in enumerate(row) if c=='|']` and asserting the list is identical for every row in the table)
   - **Every heading in `README.md` must be unique across the whole document (markdownlint rule MD024, `no-duplicate-heading`), regardless of heading level.** A quick structural check: collect every non-fenced `#{1,6}` heading and assert `collections.Counter(texts)` has no value `> 1`
 - `.github/workflows/ci.yaml` must always reflect the Snowflake object being provisioned by this module — job names, step descriptions, test targets (which must point to `tests/`, not `test/`), and required secrets/variables must reference Snowflake API integrations (not leftover references from the upstream template such as DynamoDB, S3, GCS, views, or other services)
 
-All validation (`api_provider` enum values, mutual exclusivity of AWS / Azure / GCP fields, required `api_allowed_prefixes`, `api_aws_role_arn` ARN format, `azure_tenant_id` UUID format, `google_audience` format, integration name format, required fields) lives in `variables.tf`.
+All validation lives in `variables.tf`:
+
+- `api_provider` enum (case-insensitive): `aws_api_gateway`, `aws_private_api_gateway`, `aws_gov_api_gateway`, `aws_gov_private_api_gateway`, `azure_api_management`, `google_api_gateway`. **Do not** add `git_https_api` here — see the note in *What this module does* above
+- Required `api_allowed_prefixes` (non-empty list)
+- AWS variants (any provider with prefix `aws_`) require `api_aws_role_arn` and the ARN must match `arn:aws[-partition]:iam::<12-digit>:role/<name>`
+- Azure provider requires both `azure_tenant_id` and `azure_ad_application_id`
+- GCP provider requires `google_audience`
+- `name` must be a valid Snowflake unquoted identifier
 
 ## CI pipeline (`.github/workflows/ci.yaml`)
 
 Runs on pushes/PRs to `main`, `feature/**`, `bug/**` when root-level `*.tf` files, `examples/**`, `tests/**`, or `utils/**` files change. All job names, step descriptions, and environment variables in this workflow must reference Snowflake API integrations — any leftover references to other services (DynamoDB, S3, GCS, views, IAM, etc.) from the upstream template must be replaced.
 
 1. **terraform-validate** — `fmt -check`, `init`, `validate` on the root module; also runs `utils/lint.sh` (tflint + trivy)
-2. **examples-validate** — `init` + `validate` on all `examples/*` configurations (`basic`, `multi-cloud`) (needs step 1)
-3. **terratest** — real Snowflake integration test from the `tests/` directory (needs step 2); requires `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PRIVATE_KEY`, `SNOWFLAKE_ROLE`, `SNOWFLAKE_WAREHOUSE`, plus `TEST_AWS_ROLE_ARN`, `TEST_AZURE_TENANT_ID`, `TEST_AZURE_AD_APP_ID`, and `TEST_GCP_AUDIENCE` repo secrets/vars; test job names should reference Snowflake API integrations (e.g., `snowflake-api-integration-terratest`); on success, runs `utils/update-badge.sh` to refresh the README badge
+2. **examples-validate** — `init` + `validate` on all `examples/*` configurations (`aws-api-gateway`, `multi-cloud`) (needs step 1)
+3. **terratest** — real Snowflake integration test from the `tests/` directory (needs step 2); runs `TestSnowflakeApiIntegrationAws`. Requires `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PRIVATE_KEY`, `SNOWFLAKE_ROLE`, `SNOWFLAKE_WAREHOUSE`, plus `TEST_AWS_ROLE_ARN`, `TEST_AZURE_TENANT_ID`, `TEST_AZURE_AD_APP_ID`, and `TEST_GCP_AUDIENCE` repo secrets/vars; test job names should reference Snowflake API integrations (e.g., `snowflake-api-integration-terratest`); on success, runs `utils/update-badge.sh` to refresh the README badge
 4. **docs-drift** — runs `utils/generate-docs.sh` and `utils/align-md-tables.py`, then fails if `README.md` has a diff (needs step 1)
 5. **generate-changelog** — runs `git-cliff` on non-main branches (needs step 2)
 6. **semantic-release** — runs only on `main` after steps 2, 3, and 4; uses Conventional Commits to auto-version; on success, runs `utils/update-badge.sh` to refresh the README badge with the new version

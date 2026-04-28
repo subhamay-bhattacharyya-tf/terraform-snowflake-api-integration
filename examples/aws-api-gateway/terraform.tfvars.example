@@ -1,0 +1,34 @@
+# -----------------------------------------------------------------------------
+# Example tfvars for examples/aws-api-gateway
+# -----------------------------------------------------------------------------
+# Copy to terraform.tfvars and fill in real values, OR set the corresponding
+# TF_VAR_* environment variables. The Snowflake auth values can also be left
+# empty here and provided via the SNOWFLAKE_* environment variables that the
+# snowflake provider reads natively.
+# -----------------------------------------------------------------------------
+
+api_integration_configs = {
+  aws_api_gw = {
+    name             = "AWS_API_INT"
+    api_provider     = "aws_api_gateway"
+    api_aws_role_arn = "arn:aws:iam::123456789012:role/snowflake-api-role"
+
+    api_allowed_prefixes = [
+      "https://abc123.execute-api.us-east-1.amazonaws.com/prod/",
+      "https://abc123.execute-api.us-east-1.amazonaws.com/dev/",
+    ]
+
+    api_blocked_prefixes = [
+      "https://abc123.execute-api.us-east-1.amazonaws.com/prod/admin/",
+    ]
+
+    enabled = true
+    comment = "API integration for external functions via AWS API Gateway."
+  }
+}
+
+snowflake_organization_name = "MY_ORG"
+snowflake_account_name      = "MY_ACCOUNT"
+snowflake_user              = "TF_SERVICE_USER"
+snowflake_role              = "ACCOUNTADMIN"
+# snowflake_private_key = file("~/.snowflake/tf-service-user.p8")

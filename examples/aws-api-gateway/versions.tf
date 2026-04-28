@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Terraform Snowflake API Integration Module - Basic Example Versions
+# Terraform Snowflake API Integration Module - AWS API Gateway Example Vers
 # -----------------------------------------------------------------------------
 # Inherits Terraform / provider version bounds from the root module.
 # Provider configuration uses key-pair (JWT) authentication.
@@ -13,12 +13,12 @@
 # -----------------------------------------------------------------------------
 
 terraform {
-  required_version = ">= 1.5.0"
+  required_version = ">= 1.3.0"
 
   required_providers {
     snowflake = {
-      source  = "Snowflake-Labs/snowflake"
-      version = ">= 0.95.0, < 1.0.0"
+      source  = "snowflakedb/snowflake"
+      version = ">= 1.0.0"
     }
   }
 }

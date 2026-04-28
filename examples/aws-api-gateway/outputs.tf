@@ -1,11 +1,11 @@
 # -----------------------------------------------------------------------------
-# Terraform Snowflake API Integration Module - Multi-Cloud Example Outputs
+# Terraform Snowflake API Integration Module - AWS API Gateway Example Outs
 # -----------------------------------------------------------------------------
-# Re-exports the root module's outputs. Per-cloud identity values used for
-# downstream trust setup live on each resource (api_aws_iam_user_arn /
-# api_aws_external_id for AWS, azure_consent_url /
-# azure_multi_tenant_app_name for Azure) and are accessible through the
-# sensitive `api_integrations` map.
+# Surfaces the module's output maps so downstream tooling (and Terratest) can
+# read them. The Snowflake-managed IAM user ARN and external ID required for
+# the AWS-side IAM trust policy are exposed via the sensitive
+# `api_integrations` output (look up `api_aws_iam_user_arn` and
+# `api_aws_external_id` per resource).
 # -----------------------------------------------------------------------------
 
 output "api_integration_names" {
