@@ -62,7 +62,7 @@ module "snowflake_api_integration" {
       api_provider    = "google_api_gateway"
       google_audience = "snowflake-external-functions"
       api_allowed_prefixes = [
-        "https://us-central1-my-project.cloudfunctions.net/",
+        "https://us-central1-my-project.cloudfunctions.net/snowflake-external-functions/",
       ]
     }
   }
