@@ -3,6 +3,7 @@
 ### 🚀 Features
 
 - [**breaking**] Scaffold terraform-snowflake-api-integration module
+- Add AWS API Gateway example and refactor integration configurations
 
 ### 🐛 Bug Fixes
 
@@ -12,3 +13,7 @@
 ### 🚜 Refactor
 
 - *(ci)* Streamline CI configuration and remove unused steps
+
+### 📚 Documentation
+
+- Update CHANGELOG.md [skip ci]
