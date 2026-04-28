@@ -5,6 +5,7 @@
 - [**breaking**] Scaffold terraform-snowflake-api-integration module
 - Add AWS API Gateway example and refactor integration configurations
 - Update CI configuration for Node.js 24 and enhance Snowflake test skipping logic
+- Upgrade Terraform setup action to v4 and remove Node.js 20 compatibility
 
 ### 🐛 Bug Fixes
 
@@ -17,5 +18,6 @@
 
 ### 📚 Documentation
 
+- Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
 - Update CHANGELOG.md [skip ci]
