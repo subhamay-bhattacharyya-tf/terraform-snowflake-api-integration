@@ -1,9 +1,8 @@
 # -----------------------------------------------------------------------------
-# Terraform Snowflake API Integration Module - Basic Example Main
+# Terraform Snowflake API Integration Module - Multi-Cloud Example Main
 # -----------------------------------------------------------------------------
-# Demonstrates a single AWS API Gateway integration -- the minimum viable
-# usage. Reads the `api_aws_iam_user_arn` and `api_aws_external_id` outputs
-# to wire up the IAM trust policy on the AWS side.
+# Provisions AWS + Azure + GCP API integrations in a single module call,
+# demonstrating the map-based, multi-provider use case.
 # -----------------------------------------------------------------------------
 
 module "snowflake_api_integration" {

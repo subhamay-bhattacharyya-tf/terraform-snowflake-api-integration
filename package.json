@@ -1,7 +1,7 @@
 {
-    "name": "terraform-snowflake-module-template",
+    "name": "terraform-snowflake-api-integration",
     "version": "0.0.0",
-    "description": "Terraform module for creating and managing Snowflake warehouses with Semantic Release support.",
+    "description": "Terraform module for creating and managing Snowflake API integrations across AWS API Gateway, Azure API Management, and Google Cloud, with Semantic Release support.",
     "license": "MIT",
     "scripts": {
         "release": "semantic-release"
@@ -20,16 +20,20 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/subhamay-bhattacharyya-tf/terraform-snowflake-module-template.git"
+        "url": "git+https://github.com/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration.git"
     },
     "keywords": [
         "terraform",
         "snowflake",
-        "warehouse",
+        "api-integration",
+        "external-functions",
+        "aws-api-gateway",
+        "azure-api-management",
+        "google-api-gateway",
         "infrastructure-as-code"
     ],
     "bugs": {
-        "url": "https://github.com/subhamay-bhattacharyya-tf/terraform-snowflake-module-template/issues"
+        "url": "https://github.com/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration/issues"
     },
-    "homepage": "https://github.com/subhamay-bhattacharyya-tf/terraform-snowflake-module-template#readme"
+    "homepage": "https://github.com/subhamay-bhattacharyya-tf/terraform-snowflake-api-integration#readme"
 }

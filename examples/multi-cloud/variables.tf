@@ -1,14 +1,14 @@
 # -----------------------------------------------------------------------------
-# Terraform Snowflake API Integration Module - Basic Example Variables
+# Terraform Snowflake API Integration Module - Multi-Cloud Example Variables
 # -----------------------------------------------------------------------------
-# Single AWS API Gateway integration. Override `api_integrations` from the
-# command line / tfvars to change the integration name, role ARN, or allowed
-# prefixes. Defaults are provided so `terraform validate` works without any
-# input.
+# Provisions one AWS, one Azure, and one GCP API integration in a single
+# module call. Defaults are placeholder identifiers so the example validates
+# without input; override the entire `api_integrations` map (or individual
+# fields via tfvars) for a real apply.
 # -----------------------------------------------------------------------------
 
 variable "api_integrations" {
-  description = "Map of Snowflake API integrations to create."
+  description = "Map of Snowflake API integrations to create across AWS, Azure, and GCP."
   type = map(object({
     name                 = string
     api_provider         = string
@@ -32,15 +32,35 @@ variable "api_integrations" {
 
       api_allowed_prefixes = [
         "https://abc123.execute-api.us-east-1.amazonaws.com/prod/",
-        "https://abc123.execute-api.us-east-1.amazonaws.com/dev/",
-      ]
-
-      api_blocked_prefixes = [
-        "https://abc123.execute-api.us-east-1.amazonaws.com/prod/admin/",
       ]
 
       enabled = true
-      comment = "API integration for external functions via AWS API Gateway (prod + dev stages)."
+      comment = "AWS API Gateway integration."
+    }
+    azure_api_mgmt = {
+      name                    = "AZURE_API_INT"
+      api_provider            = "azure_api_management"
+      azure_tenant_id         = "00000000-0000-0000-0000-000000000000"
+      azure_ad_application_id = "11111111-1111-1111-1111-111111111111"
+
+      api_allowed_prefixes = [
+        "https://contoso-api.azure-api.net/external/",
+      ]
+
+      enabled = true
+      comment = "Azure API Management integration for external functions."
+    }
+    gcp_api_gw = {
+      name            = "GCP_API_INT"
+      api_provider    = "google_api_gateway"
+      google_audience = "snowflake-external-functions"
+
+      api_allowed_prefixes = [
+        "https://us-central1-my-project.cloudfunctions.net/",
+      ]
+
+      enabled = true
+      comment = "GCP Cloud Functions integration for external functions."
     }
   }
 }

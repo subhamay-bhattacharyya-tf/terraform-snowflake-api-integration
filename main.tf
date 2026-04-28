@@ -1,22 +1,29 @@
 # -----------------------------------------------------------------------------
-# Terraform Snowflake Module Template - Main
+# Terraform Snowflake API Integration Module - Main
 # -----------------------------------------------------------------------------
-# This file creates and manages one or more Snowflake warehouses based on the
-# warehouse_configs map.
+# Creates one snowflake_api_integration per entry in var.api_integrations.
+# Cloud-side IAM roles, Azure AD applications, and GCP service accounts are
+# intentionally NOT managed here -- they live in their respective cloud
+# provider modules and are referenced by ARN / tenant ID / audience.
 # -----------------------------------------------------------------------------
 
-resource "snowflake_warehouse" "this" {
-  for_each = var.warehouse_configs
+resource "snowflake_api_integration" "this" {
+  for_each = var.api_integrations
 
-  name                      = each.value.name
-  warehouse_size            = each.value.warehouse_size
-  warehouse_type            = each.value.warehouse_type
-  auto_resume               = each.value.auto_resume
-  auto_suspend              = each.value.auto_suspend
-  initially_suspended       = each.value.initially_suspended
-  min_cluster_count         = each.value.min_cluster_count
-  max_cluster_count         = each.value.max_cluster_count
-  scaling_policy            = each.value.scaling_policy
-  enable_query_acceleration = each.value.enable_query_acceleration
-  comment                   = each.value.comment
+  name                 = each.value.name
+  api_provider         = each.value.api_provider
+  api_allowed_prefixes = each.value.api_allowed_prefixes
+  api_blocked_prefixes = each.value.api_blocked_prefixes
+  enabled              = each.value.enabled
+  comment              = each.value.comment
+
+  # AWS API Gateway
+  api_aws_role_arn = each.value.api_aws_role_arn
+
+  # Azure API Management
+  azure_tenant_id         = each.value.azure_tenant_id
+  azure_ad_application_id = each.value.azure_ad_application_id
+
+  # Google Cloud
+  google_audience = each.value.google_audience
 }

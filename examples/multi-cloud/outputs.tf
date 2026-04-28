@@ -1,9 +1,9 @@
 # -----------------------------------------------------------------------------
-# Terraform Snowflake API Integration Module - Basic Example Outputs
+# Terraform Snowflake API Integration Module - Multi-Cloud Example Outputs
 # -----------------------------------------------------------------------------
-# Surfaces the module's output maps so downstream tooling (and Terratest) can
-# read them. Re-export both Snowflake-side identifiers and the AWS-side
-# identity values needed to set up the IAM trust policy.
+# Re-exports every output map from the root module. Downstream cloud-side
+# trust setup (AWS IAM trust policy, Azure admin consent, etc.) reads these
+# values to wire each integration's identity into its target cloud.
 # -----------------------------------------------------------------------------
 
 output "api_integration_ids" {
@@ -30,4 +30,14 @@ output "api_aws_external_ids" {
   description = "Map of integration map keys to the Snowflake-managed external ID. Pin this in your AWS-side IAM trust policy condition."
   value       = module.snowflake_api_integration.api_aws_external_ids
   sensitive   = true
+}
+
+output "azure_consent_urls" {
+  description = "Map of integration map keys to the Azure admin consent URL for the multi-tenant app."
+  value       = module.snowflake_api_integration.azure_consent_urls
+}
+
+output "azure_multi_tenant_app_names" {
+  description = "Map of integration map keys to the Azure multi-tenant app name created for each integration."
+  value       = module.snowflake_api_integration.azure_multi_tenant_app_names
 }

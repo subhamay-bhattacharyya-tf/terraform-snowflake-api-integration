@@ -1,17 +1,19 @@
 # -----------------------------------------------------------------------------
-# Terraform Snowflake Module Template - Versions
+# Terraform Snowflake API Integration Module - Versions
 # -----------------------------------------------------------------------------
-# This file specifies the required Terraform version and provider versions
-# for the module.
+# Pins the Terraform CLI version and the Snowflake provider version that the
+# module is tested against. Examples inherit these constraints via the module
+# call; do not redeclare provider versions in example configurations with
+# different bounds.
 # -----------------------------------------------------------------------------
 
 terraform {
-  required_version = ">= 1.3.0"
+  required_version = ">= 1.5.0"
 
   required_providers {
     snowflake = {
-      source  = "snowflakedb/snowflake"
-      version = ">= 0.87.0"
+      source  = "Snowflake-Labs/snowflake"
+      version = ">= 0.95.0, < 1.0.0"
     }
   }
 }

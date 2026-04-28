@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Terraform Snowflake API Integration Module - Basic Example Versions
+# Terraform Snowflake API Integration Module - Multi-Cloud Example Versions
 # -----------------------------------------------------------------------------
 # Inherits Terraform / provider version bounds from the root module.
 # Provider configuration uses key-pair (JWT) authentication.
