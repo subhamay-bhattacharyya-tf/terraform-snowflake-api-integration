@@ -99,13 +99,16 @@ variable "api_integration_configs" {
   }
 
   # Conditional: Google requires google_audience.
+  # NOTE: `try(length(...), 0)` is used instead of `length(v.google_audience)`
+  # because Terraform's `||` short-circuit does not prevent the right-hand
+  # `length()` call from being evaluated against a null value, which raises
+  # "Invalid function argument: argument must not be null".
   validation {
     condition = alltrue([
       for k, v in var.api_integration_configs :
-      lower(v.api_provider) != "google_api_gateway" || (
-        v.google_audience != null && length(v.google_audience) > 0
-      )
+      lower(v.api_provider) != "google_api_gateway" ||
+      try(length(v.google_audience), 0) > 0
     ])
-    error_message = "Google API Gateway integrations require `google_audience`."
+    error_message = "Google API Gateway integrations require a non-empty `google_audience`."
   }
 }

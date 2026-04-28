@@ -23,9 +23,23 @@ import (
 
 // buildTerraformOptions constructs a *terraform.Options pointed at the given
 // example directory and wired with the SNOWFLAKE_* env vars used by the
-// example's provider configuration.
+// example's provider configuration. Skips the test if the credentials needed
+// to actually reach Snowflake aren't set, so CI runs without secrets (or
+// fork PRs that can't read secrets) don't masquerade as real Terratest runs.
 func buildTerraformOptions(t *testing.T, exampleDir string) *terraform.Options {
 	t.Helper()
+
+	required := []string{
+		"SNOWFLAKE_ORGANIZATION_NAME",
+		"SNOWFLAKE_ACCOUNT_NAME",
+		"SNOWFLAKE_USER",
+		"SNOWFLAKE_PRIVATE_KEY",
+	}
+	for _, key := range required {
+		if strings.TrimSpace(os.Getenv(key)) == "" {
+			t.Skipf("Skipping Terratest: %s is not set; cannot reach Snowflake.", key)
+		}
+	}
 
 	return &terraform.Options{
 		TerraformDir: exampleDir,

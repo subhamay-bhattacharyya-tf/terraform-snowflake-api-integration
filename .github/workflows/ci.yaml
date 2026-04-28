@@ -22,6 +22,12 @@ on:
 permissions:
   contents: read
 
+# Opt Node.js-20 actions (hashicorp/setup-terraform@v3, etc.) into Node.js 24
+# ahead of the June 2026 deprecation. Remove this once all consumed actions
+# ship a Node.js 24 release and we've bumped to those versions.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   # ============================================================================
   # Terraform Validate
