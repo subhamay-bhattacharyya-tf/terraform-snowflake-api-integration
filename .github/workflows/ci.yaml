@@ -1,4 +1,4 @@
-name: Snowflake API Integration CI
+name: Terraform CI
 run-name: CI run by ${{ github.actor }} on ${{ github.ref_name }}
 
 on:
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   # ============================================================================
-  # Terraform Validate (Snowflake API integration module)
+  # Terraform Validate
   # ============================================================================
   terraform-validate:
     name: Terraform Validate
@@ -40,15 +40,6 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Install tflint
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
-
-      - name: Install trivy
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-            | sudo sh -s -- -b /usr/local/bin v0.58.1
-
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
 
@@ -58,14 +49,11 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
-      - name: Lint Snowflake API integration module
-        run: bash utils/lint.sh
-
   # ============================================================================
-  # Validate Examples (basic + multi-cloud Snowflake API integrations)
+  # Validate Examples
   # ============================================================================
   examples-validate:
-    name: Validate Examples
+    name: Validate Snowflake API Integration Examples
     runs-on: ubuntu-latest
     needs: terraform-validate
     env:
@@ -93,61 +81,15 @@ jobs:
         working-directory: ${{ matrix.example }}
 
   # ============================================================================
-  # README Doc-Drift Check
+  # Terratest Integration Tests
   # ============================================================================
-  docs-drift:
-    name: README Doc-Drift Check
-    runs-on: ubuntu-latest
-    needs: terraform-validate
-    env:
-      TF_VERSION: ${{ vars.TERRAFORM_VERSION || '1.5.0' }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-
-      - name: Install terraform-docs
-        run: |
-          curl -sSLo terraform-docs.tar.gz \
-            https://terraform-docs.io/dl/v0.18.0/terraform-docs-v0.18.0-linux-amd64.tar.gz
-          tar -xzf terraform-docs.tar.gz terraform-docs
-          chmod +x terraform-docs
-          sudo mv terraform-docs /usr/local/bin/
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.x'
-
-      - name: Regenerate Inputs/Outputs tables
-        run: bash utils/generate-docs.sh
-
-      - name: Align GFM tables (markdownlint MD060)
-        run: python3 utils/align-md-tables.py
-
-      - name: Fail if README.md drifted from variables.tf / outputs.tf / main.tf
-        run: |
-          if ! git diff --quiet README.md; then
-            echo "::error::README.md is out of sync with the Snowflake API integration module."
-            echo "Run 'bash utils/generate-docs.sh && python3 utils/align-md-tables.py' locally and commit the result."
-            git diff README.md
-            exit 1
-          fi
-
-  # ============================================================================
-  # Terratest Integration Tests (Snowflake API integration)
-  # ============================================================================
-  snowflake-api-integration-terratest:
-    name: Snowflake API Integration Terratest
+  terratest:
+    name: Snowflake View Terratest
     runs-on: ubuntu-latest
     needs: examples-validate
     env:
       TF_VERSION: ${{ vars.TERRAFORM_VERSION || '1.5.0' }}
-      GO_VERSION: ${{ vars.GO_VERSION || '1.21' }}
+      GO_VERSION: '1.22'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -170,42 +112,29 @@ jobs:
           go mod download
         working-directory: tests
 
-      - name: Run Terratest - Snowflake API Integration (basic)
-        id: snowflake-api-integration-basic-test
+      - name: Run Terratest - TestSnowflakeViewBasic
+        id: snowflake-view-basic-test
         run: |
           set -o pipefail
-          go test -v -timeout 30m -run TestSnowflakeApiIntegrationBasic 2>&1 \
-            | tee snowflake_api_integration_basic_output.txt
-          echo "## Snowflake API Integration (basic) Test Results" >> $GITHUB_STEP_SUMMARY
+          go test -v -timeout 30m -run TestSnowflakeViewBasic 2>&1 | tee snowflake_view_basic_output.txt
+          echo "## Snowflake View Basic Test Results" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          cat snowflake_api_integration_basic_output.txt >> $GITHUB_STEP_SUMMARY
+          cat snowflake_view_basic_output.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
         working-directory: tests
         env:
-          SNOWFLAKE_ORGANIZATION_NAME: ${{ vars.SNOWFLAKE_ORGANIZATION_NAME }}
-          SNOWFLAKE_ACCOUNT_NAME: ${{ vars.SNOWFLAKE_ACCOUNT_NAME }}
-          SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
-          SNOWFLAKE_ROLE: ${{ vars.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ vars.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
-          TEST_AWS_ROLE_ARN: ${{ vars.TEST_AWS_ROLE_ARN }}
-          TEST_AZURE_TENANT_ID: ${{ vars.TEST_AZURE_TENANT_ID }}
-          TEST_AZURE_AD_APP_ID: ${{ vars.TEST_AZURE_AD_APP_ID }}
-          TEST_GCP_AUDIENCE: ${{ vars.TEST_GCP_AUDIENCE }}
-
-      - name: Update README badge (Snowflake API integration tests passed)
-        if: success()
-        run: |
-          bash utils/update-badge.sh \
-            --label "tests" --message "passing" --color "brightgreen"
-        env:
-          BADGE_GIST_ID: ${{ secrets.BADGE_GIST_ID }}
-          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
+          SNOWFLAKE_ACCOUNT:       ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER:          ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PRIVATE_KEY:   ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          SNOWFLAKE_ROLE:          ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE:     ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_TEST_DATABASE: ${{ vars.SNOWFLAKE_TEST_DATABASE }}
+          SNOWFLAKE_TEST_SCHEMA:   ${{ vars.SNOWFLAKE_TEST_SCHEMA }}
 
   # ============================================================================
   # Generate Change Log
   # ============================================================================
+
   generate-changelog:
     name: Generate Changelog
     runs-on: ubuntu-latest
@@ -243,7 +172,7 @@ jobs:
   semantic-release:
     name: Semantic Release
     runs-on: ubuntu-latest
-    needs: [examples-validate, docs-drift, snowflake-api-integration-terratest]
+    needs: [examples-validate, terratest]
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
@@ -262,7 +191,6 @@ jobs:
           node-version: 'lts/*'
 
       - name: Semantic Release
-        id: semantic
         uses: cycjimmy/semantic-release-action@v6
         with:
           extra_plugins: |
@@ -274,14 +202,3 @@ jobs:
             conventional-changelog-conventionalcommits@9.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update README badge (Snowflake API integration release)
-        if: steps.semantic.outputs.new_release_published == 'true'
-        run: |
-          bash utils/update-badge.sh \
-            --label "release" \
-            --message "v${{ steps.semantic.outputs.new_release_version }}" \
-            --color "blue"
-        env:
-          BADGE_GIST_ID: ${{ secrets.BADGE_GIST_ID }}
-          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
